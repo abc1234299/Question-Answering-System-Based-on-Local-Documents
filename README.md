@@ -33,21 +33,127 @@
 | **ollama.log** | Ollama模型服务日志 |
 
 ## 🔧 安装步骤
-
+```markdown
 ### 1. 克隆项目
-```bash
-git clone <项目地址>
+```
+git clone https://github.com/abc1234299/Question-Answering-System-Based-on-Local-Documents.git
 cd Question-Answering-System-Based-on-Local-Documents
 
-
-## 📦 步骤 2：安装依赖
-
-### 安装核心依赖包
-```bash
-# 使用清华镜像源加速安装
-pip install langchain langchain_text_splitters faiss-gpu sentence-transformers ollama pypdf gradio -i https://pypi.tuna.tsinghua.edu.cn/simple
-
 ### 2. 安装 Python 依赖
-
-```bash
+```markdown
 pip install langchain langchain_text_splitters faiss-gpu sentence-transformers ollama pypdf gradio -i https://pypi.tuna.tsinghua.edu.cn/simple
+
+### 3. 验证安装
+python -c "import langchain; print('✅ LangChain 安装成功')"
+
+### 4. 安装 Ollama
+curl -fsSL https://ollama.ai/install.sh | sh
+ollama pull qwen2.5:7b
+```
+
+## 🚀 快速使用
+```markdown
+### 启动系统
+```
+python src/main.py
+
+### 访问 Web 界面
+http://<服务器IP>:7860
+
+
+## ⚡ 性能优化配置
+针对 RTX3090 显卡特性，以下配置可最大化利用硬件性能，兼顾问答速度和准确率：
+
+### 1. GPU 全链路加速设置
+```python
+# 嵌入模型 GPU 加速（m3e-large 中文模型）
+embeddings = SentenceTransformerEmbeddings(
+    model_name="moka-ai/m3e-large",
+    model_kwargs={"device": "cuda"}  # 强制使用 GPU 进行嵌入计算
+)
+
+# LLM 模型 GPU 分配（qwen2.5:7b）
+llm = Ollama(model="qwen2.5:7b", num_gpu=1)  # num_gpu=1 为模型分配全部 GPU 资源
+```
+### 2. 显存优化
+# 方案1：调整文本分割参数（减少单次计算显存占用）
+```python
+text_splitter = RecursiveCharacterTextSplitter(
+    chunk_size=1200,  # 适度增大 chunk 尺寸，减少总片段数
+    chunk_overlap=150,  # 降低重叠率，减少重复计算
+    separators=["\n\n", "\n", "。", "！", "？", "；", "，"]
+)
+```
+# 方案2：LLM 显存限制（避免显存溢出）
+```python
+llm = Ollama(
+    model="qwen2.5:7b",
+    num_gpu=1,
+    num_ctx=8192,  # 上下文窗口大小（平衡显存和问答能力）
+    temperature=0.1  # 降低随机性，减少计算量
+)
+```
+# 方案3：FAISS GPU 索引优化
+```python
+db = FAISS.from_documents(split_docs, embeddings)
+db = db.to_gpu()  # 强制将向量库加载到 GPU，检索速度提升 5-10 倍
+```
+
+## 🐛 常见问题
+### Q1：依赖安装失败
+**问题现象**：执行 `pip install` 时出现包冲突、编译失败或下载超时  
+**解决方案**：
+```bash
+# 方案1：使用虚拟环境隔离依赖（推荐）
+python -m venv rag_venv
+source rag_venv/bin/activate  # Linux/Mac
+# rag_venv\Scripts\activate  # Windows
+
+# 方案2：分步安装，优先解决 faiss-gpu 依赖问题
+pip install faiss-gpu==1.7.2 --no-deps -i https://pypi.tuna.tsinghua.edu.cn/simple
+pip install langchain sentence-transformers pypdf gradio ollama -i https://pypi.tuna.tsinghua.edu.cn/simple
+
+# 方案3：降级 pip 版本（适配部分系统）
+pip install pip==23.0.1
+```
+### Q2：Ollama 模型下载慢 / 失败
+**问题现象**：ollama pull qwen2.5:7b 速度极慢或提示连接超时解决方案：
+**解决方案**
+```bash
+# 临时配置镜像源（单次生效）
+export OLLAMA_HOST=https://mirror.ghproxy.com
+ollama pull qwen2.5:7b
+
+# 永久配置镜像源（Linux）
+echo 'export OLLAMA_HOST=https://mirror.ghproxy.com' >> ~/.bashrc
+source ~/.bashrc
+ollama pull qwen2.5:7b
+
+# 备选方案：手动下载模型文件后导入
+# 1. 下载模型文件到本地
+# 2. 执行：ollama create qwen2.5:7b -f ./Modelfile
+```
+### Q3：GPU 内存不足（OOM 报错
+**问题现象**：运行时提示 CUDA out of memory 或程序崩溃解决方案：
+**解决方案**
+```python
+# 方案1：减少检索片段数量（降低 LLM 推理压力）
+retriever = db.as_retriever(search_kwargs={"k": 2})  # 从 4 降至 2
+
+# 方案2：更换轻量嵌入模型 + 调整批处理大小
+embeddings = SentenceTransformerEmbeddings(
+    model_name="moka-ai/m3e-base",  # 替换为基础版（显存占用减少 50%）
+    model_kwargs={"device": "cuda", "batch_size": 16}  # 降低批处理大小
+)
+
+# 方案3：使用更小的 LLM 模型
+llm = Ollama(model="qwen2.5:4b", num_gpu=1)  # 4B 模型替代 7B 模型
+
+# 方案4：启用显存分片（终极方案）
+import torch
+torch.cuda.empty_cache()  # 清理显存缓存
+embeddings = SentenceTransformerEmbeddings(
+    model_name="moka-ai/m3e-large",
+    model_kwargs={"device": "cuda", "trust_remote_code": True, "load_in_8bit": True}
+)
+```
