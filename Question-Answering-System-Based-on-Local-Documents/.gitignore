@@ -1,0 +1,18 @@
+# Python
+__pycache__/
+*.pyc
+*.log
+
+# RAG generated data
+faiss_db/
+faiss_gpu_db/
+uploaded_docs/
+
+# Environment
+.env
+venv/
+.venv/
+
+# Editors
+.vscode/
+.idea/

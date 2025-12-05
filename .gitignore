@@ -1,0 +1,25 @@
+# Models & Cache
+models/
+.cache/
+~/.cache/huggingface/
+transformers/
+sentence_transformers/
+
+# RAG Generated Data
+faiss_db/
+faiss_gpu_db/
+uploaded_docs/
+results/
+*.log
+
+# Python
+__pycache__/
+*.pyc
+.env
+venv/
+.venv/
+
+# Editors
+.vscode/
+.idea/
+.DS_Store

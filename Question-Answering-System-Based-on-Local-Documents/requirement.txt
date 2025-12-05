@@ -1,0 +1,9 @@
+langchain
+langchain_text_splitters
+faiss-gpu
+sentence-transformers
+ollama
+pypdf
+gradio
+langchain-community
+langchain-huggingface
